@@ -175,10 +175,10 @@ export default function POS({ products = [], onCheckout }) {
   };
 
   return (
-    <div className="h-[calc(100vh-140px)] flex gap-6 relative animate-fade-in">
+    <div className="h-full flex-grow flex gap-6 relative animate-fade-in min-h-0">
       
       {/* Left Pane - Visual Catalog & Grid */}
-      <div className="w-[45%] flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="flex-[1.2] flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-w-[340px]">
         {/* Search header */}
         <div className="p-4 border-b border-slate-50 bg-slate-50/20 space-y-3">
           <div className="relative">
@@ -193,7 +193,7 @@ export default function POS({ products = [], onCheckout }) {
           </div>
           
           {/* Categories Horizontal Scroller */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+          <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {categories.map(cat => (
               <button
                 key={cat}
@@ -256,7 +256,7 @@ export default function POS({ products = [], onCheckout }) {
       </div>
 
       {/* Center Pane - Barcode Scan & Cart */}
-      <div className="flex-1 flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="flex-[1.4] flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-w-[360px]">
         {/* Scanner Barcode Input */}
         <div className="p-4 border-b border-slate-50 bg-slate-50/20">
           <form onSubmit={handleScan} className="relative">
@@ -336,7 +336,7 @@ export default function POS({ products = [], onCheckout }) {
       </div>
 
       {/* Right Pane - Checkout Summary Sheet */}
-      <div className="w-80 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
+      <div className="w-80 shrink-0 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-50">
           <h3 className="font-bold text-slate-900 text-sm">Customer & Summary</h3>
         </div>
