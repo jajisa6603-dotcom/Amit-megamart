@@ -1,351 +1,284 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, ShoppingBag, AlertTriangle, IndianRupee, ArrowRight, Package, ChevronRight } from 'lucide-react';
+import {
+  TrendingUp, ShoppingBag, AlertTriangle, IndianRupee,
+  ArrowRight, Package, ArrowUpRight, ArrowDownRight, BarChart2
+} from 'lucide-react';
 
 export default function Dashboard({ products = [], sales = [] }) {
-  // 1. Calculate Key Metrics
-  const lowStockThreshold = 10;
-  
-  // Total Inventory Value
-  const totalInventoryValue = products.reduce((sum, p) => sum + (p.price * p.stock), 0);
-  
-  // Low Stock Count
-  const lowStockItems = products.filter(p => p.stock <= lowStockThreshold);
-  
-  // Today's Sales
+  const LOW = 10;
+
+  const totalInventoryValue = products.reduce((s, p) => s + p.price * p.stock, 0);
+  const lowStockItems = products.filter(p => p.stock <= LOW);
+
   const today = new Date().toISOString().split('T')[0];
-  const todaySales = sales.filter(s => {
-    const saleDate = new Date(s.created_at).toISOString().split('T')[0];
-    return saleDate === today;
-  });
-  
-  const todayRevenue = todaySales.reduce((sum, s) => sum + Number(s.total_amount), 0);
-  const todayCount = todaySales.length;
+  const todaySales = sales.filter(s => new Date(s.created_at).toISOString().split('T')[0] === today);
+  const todayRevenue = todaySales.reduce((s, x) => s + Number(x.total_amount), 0);
 
-  // 2. Prepare SVG Sales Trend Data (Last 7 Days)
-  const getLast7Days = () => {
-    const dates = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      dates.push(d.toISOString().split('T')[0]);
-    }
-    return dates;
-  };
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yDate = yesterday.toISOString().split('T')[0];
+  const yRevenue = sales
+    .filter(s => new Date(s.created_at).toISOString().split('T')[0] === yDate)
+    .reduce((s, x) => s + Number(x.total_amount), 0);
 
-  const last7Days = getLast7Days();
-  const dailyTotals = last7Days.map(dateStr => {
-    const daySales = sales.filter(s => {
-      const saleDate = new Date(s.created_at).toISOString().split('T')[0];
-      return saleDate === dateStr;
-    });
-    return daySales.reduce((sum, s) => sum + Number(s.total_amount), 0);
+  const revenueChange = yRevenue > 0 ? ((todayRevenue - yRevenue) / yRevenue) * 100 : null;
+
+  // Last 7 days chart data
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split('T')[0];
   });
 
-  // Calculate coordinates for SVG Path
-  const maxSale = Math.max(...dailyTotals, 1000); // Minimum max of 1000 for height scaling
-  const chartHeight = 120;
-  const chartWidth = 500;
-  const padding = 20;
+  const dailyTotals = last7.map(date =>
+    sales
+      .filter(s => new Date(s.created_at).toISOString().split('T')[0] === date)
+      .reduce((s, x) => s + Number(x.total_amount), 0)
+  );
 
-  const points = dailyTotals.map((amount, idx) => {
-    const x = padding + (idx * (chartWidth - padding * 2)) / 6;
-    // Invert Y coordinate since SVG (0,0) is top-left
-    const y = chartHeight - padding - (amount / maxSale) * (chartHeight - padding * 2);
-    return { x, y, amount, date: last7Days[idx] };
-  });
+  const maxVal = Math.max(...dailyTotals, 500);
 
-  const pathD = points.reduce((acc, p, idx) => {
-    return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
-  }, '');
-
-  // For filling gradient under the line
-  const areaD = points.length > 0 
-    ? `${pathD} L ${points[points.length - 1].x} ${chartHeight - padding} L ${points[0].x} ${chartHeight - padding} Z`
-    : '';
-
-  // Get Top Products (mocked ranking from actual sales data or just high value sales)
-  // Let's count actual top sold items from sales history
+  // Top products
   const topProducts = React.useMemo(() => {
-    const countMap = {};
+    const map = {};
     sales.forEach(sale => {
-      // If sale_items details exist in the sale record
-      if (sale.items) {
-        sale.items.forEach(item => {
-          const name = item.product_name || item.name || 'Unknown Product';
-          countMap[name] = (countMap[name] || 0) + item.quantity;
-        });
-      }
+      (sale.items || []).forEach(item => {
+        const n = item.product_name || item.name || 'Unknown';
+        map[n] = (map[n] || 0) + item.quantity;
+      });
     });
-    
-    // Sort and get top 4
-    return Object.entries(countMap)
-      .map(([name, quantity]) => ({ name, quantity }))
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 4);
+    return Object.entries(map)
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
   }, [sales]);
 
-  return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
+  const fmt = n => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const KPICard = ({ label, value, sub, icon: Icon, color, link, linkLabel, change }) => (
+    <div className="bg-white rounded-2xl p-5 flex flex-col gap-4 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Overview Dashboard</h1>
-          <p className="text-slate-500 mt-1 text-sm font-medium">Amit Mega Mart Operations Portal</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
+          <p className="text-2xl font-black text-slate-900 mt-1 tracking-tight">{value}</p>
+          {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
         </div>
-        <div className="text-slate-500 text-xs font-semibold bg-white border border-slate-100 px-4 py-2 rounded-xl shadow-sm">
-          Updated: {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-        </div>
-      </div>
-
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Today's Sales */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/50 flex flex-col justify-between group hover:shadow-md hover:border-slate-200/50 transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Today's Revenue</span>
-              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">₹{todayRevenue.toFixed(2)}</h2>
-            </div>
-            <div className="bg-blue-50 text-blue-600 p-3 rounded-xl group-hover:scale-110 transition-transform duration-300">
-              <IndianRupee size={20} />
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>{todayCount} Transactions</span>
-            <span className="text-emerald-600 font-bold">Live Synced</span>
-          </div>
-        </div>
-
-        {/* Total Orders */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/50 flex flex-col justify-between group hover:shadow-md hover:border-slate-200/50 transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Sales Logs</span>
-              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">{sales.length} Bills</h2>
-            </div>
-            <div className="bg-indigo-50 text-indigo-600 p-3 rounded-xl group-hover:scale-110 transition-transform duration-300">
-              <ShoppingBag size={20} />
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>All-time checkouts</span>
-            <Link to="/sales" className="text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5 font-bold hover:underline">
-              View Log <ArrowRight size={12} />
-            </Link>
-          </div>
-        </div>
-
-        {/* Low Stock Alerts */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/50 flex flex-col justify-between group hover:shadow-md hover:border-slate-200/50 transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Critical Alerts</span>
-              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                {lowStockItems.length} {lowStockItems.length === 1 ? 'item' : 'items'}
-              </h2>
-            </div>
-            <div className={`p-3 rounded-xl group-hover:scale-110 transition-transform duration-300 ${lowStockItems.length > 0 ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-400'}`}>
-              <AlertTriangle size={20} />
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Stock under {lowStockThreshold} units</span>
-            {lowStockItems.length > 0 ? (
-              <Link to="/inventory" className="text-red-600 hover:text-red-700 font-bold flex items-center gap-0.5 hover:underline">
-                Reorder Now <ArrowRight size={12} />
-              </Link>
-            ) : (
-              <span className="text-emerald-600 font-bold">Stock Healthy</span>
-            )}
-          </div>
-        </div>
-
-        {/* Inventory Valuation */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/50 flex flex-col justify-between group hover:shadow-md hover:border-slate-200/50 transition-all duration-300">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Inventory Value</span>
-              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">₹{totalInventoryValue.toLocaleString()}</h2>
-            </div>
-            <div className="bg-emerald-50 text-emerald-600 p-3 rounded-xl group-hover:scale-110 transition-transform duration-300">
-              <Package size={20} />
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>{products.length} Unique Products</span>
-            <Link to="/inventory" className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-0.5 hover:underline">
-              Inventory <ArrowRight size={12} />
-            </Link>
-          </div>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: color + '18' }}>
+          <Icon size={19} style={{ color }} />
         </div>
       </div>
+      <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+        {change !== undefined && change !== null ? (
+          <span className={`flex items-center gap-1 text-xs font-semibold ${change >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+            {change >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+            {Math.abs(change).toFixed(1)}% vs yesterday
+          </span>
+        ) : (
+          <span className="text-xs text-slate-400">{sub || ''}</span>
+        )}
+        {link && (
+          <Link to={link} className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+            {linkLabel} <ArrowRight size={11} />
+          </Link>
+        )}
+      </div>
+    </div>
+  );
 
-      {/* Main Grid: Graph + Side Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sales Chart Card */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm lg:col-span-2 space-y-6 flex flex-col justify-between">
-          <div className="flex justify-between items-center">
+  return (
+    <div className="space-y-6 pb-8 animate-fade-up">
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          label="Today's Revenue"
+          value={`₹${fmt(todayRevenue)}`}
+          icon={IndianRupee}
+          color="#2563eb"
+          change={revenueChange}
+          link="/sales"
+          linkLabel="View Sales"
+        />
+        <KPICard
+          label="Total Transactions"
+          value={`${sales.length}`}
+          sub="All-time checkouts"
+          icon={ShoppingBag}
+          color="#8b5cf6"
+          link="/sales"
+          linkLabel="View All"
+        />
+        <KPICard
+          label="Low Stock Alerts"
+          value={`${lowStockItems.length}`}
+          sub={`Items under ${LOW} units`}
+          icon={AlertTriangle}
+          color={lowStockItems.length > 0 ? '#ef4444' : '#10b981'}
+          link="/inventory"
+          linkLabel="Fix Now"
+        />
+        <KPICard
+          label="Inventory Value"
+          value={`₹${fmt(totalInventoryValue)}`}
+          sub={`${products.length} unique SKUs`}
+          icon={Package}
+          color="#10b981"
+          link="/inventory"
+          linkLabel="Manage"
+        />
+      </div>
+
+      {/* Chart + Top Products */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Bar Chart */}
+        <div className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="font-bold text-slate-900 text-base">Weekly Revenue Trend</h3>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">Rolling 7-day revenue visualization</p>
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <BarChart2 size={16} className="text-blue-600" /> Weekly Revenue
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">Last 7 days</p>
             </div>
-            <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100/30">
-              <TrendingUp size={14} />
-              <span>Positive growth</span>
+            <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+              <TrendingUp size={12} /> Live data
+            </span>
+          </div>
+
+          {dailyTotals.every(v => v === 0) ? (
+            <div className="flex items-center justify-center h-40 text-slate-400 text-sm">
+              No sales data yet — make a sale in POS Billing!
             </div>
-          </div>
-
-          {/* SVG line chart */}
-          <div className="relative w-full h-44 flex items-center justify-center">
-            {dailyTotals.every(val => val === 0) ? (
-              <div className="text-slate-400 text-xs font-medium py-10">No recent sales records to chart. Make checkout transactions in POS Billing!</div>
-            ) : (
-              <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full overflow-visible">
-                <defs>
-                  <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.00" />
-                  </linearGradient>
-                </defs>
-
-                {/* Grid Lines */}
-                <line x1={padding} y1={padding} x2={chartWidth - padding} y2={padding} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3" />
-                <line x1={padding} y1={chartHeight / 2} x2={chartWidth - padding} y2={chartHeight / 2} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3" />
-                <line x1={padding} y1={chartHeight - padding} x2={chartWidth - padding} y2={chartHeight - padding} stroke="#f1f5f9" strokeWidth="1" />
-
-                {/* Filled Gradient Area */}
-                {areaD && <path d={areaD} fill="url(#chart-grad)" />}
-
-                {/* Line Path */}
-                {pathD && <path d={pathD} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-sm" />}
-
-                {/* Chart Dots & Values */}
-                {points.map((p, idx) => (
-                  <g key={idx} className="group cursor-pointer">
-                    <circle cx={p.x} cy={p.y} r="4.5" fill="#ffffff" stroke="#2563eb" strokeWidth="2.5" className="transition-all duration-200 hover:r-6 hover:fill-blue-600" />
-                    <text x={p.x} y={chartHeight - 4} textAnchor="middle" className="text-[7px] font-bold fill-slate-400">
-                      {new Date(p.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                    </text>
-                    <text x={p.x} y={p.y - 8} textAnchor="middle" className="text-[7px] font-extrabold fill-slate-700 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      ₹{p.amount.toFixed(0)}
-                    </text>
-                  </g>
-                ))}
-              </svg>
-            )}
-          </div>
-        </div>
-
-        {/* Top Products Card */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-          <div>
-            <h3 className="font-bold text-slate-900 text-base">Top Selling Products</h3>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Best-moving inventory items</p>
-          </div>
-
-          <div className="space-y-3.5">
-            {topProducts.length === 0 ? (
-              <div className="text-slate-400 text-xs text-center py-12 font-medium">
-                No orders processed yet.
-              </div>
-            ) : (
-              topProducts.map((p, idx) => (
-                <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-b-0">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 font-bold text-xs flex items-center justify-center">
-                      #{idx + 1}
+          ) : (
+            <div className="flex items-end gap-2 h-40">
+              {dailyTotals.map((val, i) => {
+                const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+                const date = new Date(last7[i]);
+                const label = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                const isToday = last7[i] === today;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group">
+                    {val > 0 && (
+                      <span className="text-[9px] font-bold text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        ₹{val.toFixed(0)}
+                      </span>
+                    )}
+                    <div className="w-full rounded-t-lg transition-all duration-500 relative" style={{
+                      height: `${Math.max(pct, 3)}%`,
+                      background: isToday
+                        ? 'linear-gradient(to top,#1d4ed8,#3b82f6)'
+                        : 'linear-gradient(to top,#dbeafe,#93c5fd)',
+                      minHeight: 4
+                    }} />
+                    <span className={`text-[9px] font-medium ${isToday ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>
+                      {label}
                     </span>
-                    <span className="font-semibold text-slate-800 text-xs truncate max-w-[150px]">{p.name}</span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs font-extrabold text-slate-900">{p.quantity} units</span>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Sold</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Low Stock and Recent Sales Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Recent Operations Log */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col justify-between">
-          <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-slate-900 text-base">Recent Sales</h3>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">Most recent checkout transactions</p>
+                );
+              })}
             </div>
-            <Link to="/sales" className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-0.5 hover:underline">
-              All Bills <ChevronRight size={14} />
-            </Link>
-          </div>
-          <div className="p-6 pt-0 divide-y divide-slate-50 overflow-y-auto max-h-72">
-            {sales.length === 0 ? (
-              <div className="text-center text-slate-400 text-xs py-16 font-medium">No sales recorded yet.</div>
-            ) : (
-              sales.slice(0, 5).map((sale) => (
-                <div key={sale.id} className="flex justify-between items-center py-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800">
-                        {sale.customer_name || 'Walk-in Customer'}
-                      </span>
-                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                        sale.payment_method === 'UPI' ? 'bg-indigo-50 text-indigo-600' :
-                        sale.payment_method === 'Card' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
-                      }`}>
-                        {sale.payment_method}
-                      </span>
+          )}
+        </div>
+
+        {/* Top Products */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <h3 className="font-bold text-slate-900 text-sm mb-4">Top Selling Products</h3>
+          {topProducts.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-slate-400 text-xs text-center">
+              No orders yet.<br />Process a sale to see rankings.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {topProducts.map((p, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span
+                    className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0"
+                    style={{ background: '#eff6ff', color: '#2563eb' }}
+                  >
+                    #{i + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 truncate">{p.name}</p>
+                    <div className="h-1 rounded-full bg-slate-100 mt-1.5">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${(p.qty / topProducts[0].qty) * 100}%`, background: '#2563eb' }}
+                      />
                     </div>
-                    <p className="text-[10px] text-slate-400 font-medium">
-                      Invoice: #{sale.id.slice(0, 8)} • {new Date(sale.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 shrink-0">{p.qty}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Sales + Low Stock */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* Recent Sales */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <h3 className="font-bold text-slate-900 text-sm">Recent Transactions</h3>
+            <Link to="/sales" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+              All Bills <ArrowRight size={11} />
+            </Link>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {sales.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs">No sales recorded yet.</div>
+            ) : (
+              sales.slice(0, 5).map(sale => (
+                <div key={sale.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{sale.customer_name || 'Walk-in Customer'}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {new Date(sale.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} ·{' '}
+                      {new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ·{' '}
+                      <span className="font-semibold text-slate-500">{sale.payment_method}</span>
                     </p>
                   </div>
-                  <div className="text-right">
-                    <span className="text-sm font-bold text-slate-900">₹{Number(sale.total_amount).toFixed(2)}</span>
-                  </div>
+                  <span className="font-bold text-slate-900 text-sm">
+                    ₹{Number(sale.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        {/* Low Stock Summary */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col justify-between">
-          <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-slate-900 text-base">Low Stock Alerts</h3>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">Products requiring immediate replenishment</p>
-            </div>
-            <Link to="/inventory" className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center gap-0.5 hover:underline">
-              Inventory <ChevronRight size={14} />
+        {/* Low Stock */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <h3 className="font-bold text-slate-900 text-sm">Stock Alerts</h3>
+            <Link to="/inventory" className="text-xs font-semibold text-red-500 hover:text-red-600 flex items-center gap-0.5">
+              Reorder <ArrowRight size={11} />
             </Link>
           </div>
-          <div className="p-6 pt-0 divide-y divide-slate-50 overflow-y-auto max-h-72">
+          <div className="divide-y divide-slate-50">
             {lowStockItems.length === 0 ? (
-              <div className="text-center text-emerald-600 text-xs py-16 font-bold flex flex-col items-center gap-2">
-                <div className="bg-emerald-50 p-3 rounded-full text-emerald-500">
-                  <Package size={24} />
-                </div>
-                <span>Excellent! All products are well stocked.</span>
+              <div className="py-12 text-center">
+                <Package size={28} className="mx-auto text-emerald-400 mb-2" />
+                <p className="text-xs text-emerald-600 font-semibold">All products well stocked!</p>
               </div>
             ) : (
-              lowStockItems.map((prod) => (
-                <div key={prod.id} className="flex justify-between items-center py-3">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-bold text-slate-800">{prod.name}</span>
-                    <p className="text-[10px] text-slate-400 font-medium">
-                      SKU: {prod.barcode} • Category: {prod.category}
-                    </p>
+              lowStockItems.slice(0, 5).map(prod => (
+                <div key={prod.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{prod.name}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{prod.category} · SKU: {prod.barcode}</p>
                   </div>
-                  <div className="text-right flex items-center gap-2.5">
-                    <span className={`text-xs font-extrabold px-2.5 py-1 rounded-lg ${prod.stock === 0 ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}`}>
-                      {prod.stock === 0 ? 'Out of stock' : `${prod.stock} left`}
-                    </span>
-                  </div>
+                  <span
+                    className="text-xs font-bold px-2.5 py-1 rounded-lg"
+                    style={{
+                      background: prod.stock === 0 ? '#fef2f2' : '#fffbeb',
+                      color: prod.stock === 0 ? '#ef4444' : '#d97706'
+                    }}
+                  >
+                    {prod.stock === 0 ? 'Out of stock' : `${prod.stock} left`}
+                  </span>
                 </div>
               ))
             )}

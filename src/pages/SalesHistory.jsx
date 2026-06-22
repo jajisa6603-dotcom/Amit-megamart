@@ -246,9 +246,8 @@ export default function SalesHistory({ sales = [], isUsingMock }) {
 
       {/* ── Invoice Modal ────────────────────────────────── */}
       {showInvoice && selectedSale && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowInvoice(false)}>
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="flex min-h-full items-start justify-center p-4 pt-8" onClick={() => setShowInvoice(false)}>
 
           {/* Modal Card */}
           <div
@@ -396,6 +395,7 @@ export default function SalesHistory({ sales = [], isUsingMock }) {
             </div>
           </div>
         </div>
+      </div>
       )}
     </div>
   );
