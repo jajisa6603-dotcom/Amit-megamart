@@ -244,9 +244,9 @@ export default function POS({ products = [], onCheckout }) {
                       {prod.name}
                     </h4>
                   </div>
-                  <div className="mt-3.5 flex justify-between items-center pt-2 border-t border-slate-50">
+                  <div className="mt-3 pt-2 border-t border-slate-50 flex flex-col gap-0.5 text-left shrink-0">
                     <span className="font-extrabold text-sm text-slate-900">₹{prod.price.toFixed(2)}</span>
-                    <span className="text-[10px] text-slate-400 font-bold">Qty: {prod.stock}</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Stock: {prod.stock} units</span>
                   </div>
                 </button>
               ))}
