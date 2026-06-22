@@ -1,32 +1,31 @@
 import { useState, useMemo } from 'react';
-import { Search, Eye, Printer, X, Loader2, ArrowUpDown } from 'lucide-react';
+import {
+  Search, Eye, Printer, X, Loader2, ArrowUpDown,
+  History, IndianRupee, ShoppingBag, CreditCard, ChevronDown
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabaseClient';
 
 export default function SalesHistory({ sales = [], isUsingMock }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All');
-  
-  // Sort State
   const [sortField, setSortField] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
-
-  // Receipt Modal State
   const [selectedSale, setSelectedSale] = useState(null);
   const [saleItems, setSaleItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
 
+  // ── Stats ─────────────────────────────────────────────────
+  const totalRevenue = sales.reduce((s, x) => s + Number(x.total_amount || 0), 0);
+  const totalTax = sales.reduce((s, x) => s + Number(x.tax_amount || 0), 0);
+  const totalSaved = sales.reduce((s, x) => s + Number(x.discount_amount || 0), 0);
+
   const handleSort = (field) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('desc');
-    }
+    if (sortField === field) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortOrder('desc'); }
   };
 
-  // Fetch individual sale items (joined with product details)
   const handleViewReceipt = async (sale) => {
     setSelectedSale(sale);
     setShowInvoice(true);
@@ -34,206 +33,196 @@ export default function SalesHistory({ sales = [], isUsingMock }) {
     setSaleItems([]);
 
     if (isUsingMock) {
-      // Offline mode uses embedded items array
       setSaleItems(sale.items || []);
       setLoadingItems(false);
       return;
     }
 
     try {
-      // Online mode: Query Supabase sale_items with a relation join to products
       const { data, error } = await supabase
         .from('sale_items')
-        .select(`
-          id,
-          quantity,
-          price,
-          products (
-            name,
-            barcode
-          )
-        `)
+        .select(`id, quantity, price, products ( name, barcode )`)
         .eq('sale_id', sale.id);
 
       if (error) throw error;
 
-      // Map join results to match consistent format
-      const formattedItems = data.map(item => ({
+      setSaleItems(data.map(item => ({
         id: item.id,
         quantity: item.quantity,
         price: Number(item.price),
-        name: item.products ? item.products.name : 'Unknown Product',
-        barcode: item.products ? item.products.barcode : 'N/A'
-      }));
-
-      setSaleItems(formattedItems);
+        name: item.products?.name || 'Unknown Product',
+        barcode: item.products?.barcode || 'N/A'
+      })));
     } catch (err) {
       console.error('Error fetching sale items:', err.message);
-      toast.error('Failed to load transaction products. Using local inventory cross-reference.');
-      
-      // Fallback: Try manual matching with loaded products if details missing
-      if (sale.items) {
-        setSaleItems(sale.items);
-      } else {
-        setSaleItems([]);
-      }
+      toast.error('Could not load transaction items.');
+      setSaleItems(sale.items || []);
     } finally {
       setLoadingItems(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  // Filter Sales list
   const filteredSales = useMemo(() => {
-    return sales.filter(s => {
-      const matchesPayment = paymentFilter === 'All' || s.payment_method === paymentFilter;
-      
-      const query = searchQuery.toLowerCase().trim();
-      const customerName = (s.customer_name || '').toLowerCase();
-      const customerPhone = (s.customer_phone || '').toLowerCase();
-      const invoiceId = s.id.toLowerCase();
-      
-      const matchesSearch = !query ||
-        customerName.includes(query) ||
-        customerPhone.includes(query) ||
-        invoiceId.includes(query);
-
-      return matchesPayment && matchesSearch;
-    }).sort((a, b) => {
-      let multiplier = sortOrder === 'asc' ? 1 : -1;
-      
-      if (sortField === 'created_at') {
-        return (new Date(a.created_at) - new Date(b.created_at)) * multiplier;
-      }
-      if (sortField === 'total_amount') {
-        return (Number(a.total_amount) - Number(b.total_amount)) * multiplier;
-      }
-      if (sortField === 'customer_name') {
-        const nameA = a.customer_name || 'Walk-in';
-        const nameB = b.customer_name || 'Walk-in';
-        return nameA.localeCompare(nameB) * multiplier;
-      }
-      return 0;
-    });
+    return sales
+      .filter(s => {
+        const matchPay = paymentFilter === 'All' || s.payment_method === paymentFilter;
+        const q = searchQuery.toLowerCase().trim();
+        const matchSearch = !q ||
+          (s.customer_name || '').toLowerCase().includes(q) ||
+          (s.customer_phone || '').toLowerCase().includes(q) ||
+          s.id.toLowerCase().includes(q);
+        return matchPay && matchSearch;
+      })
+      .sort((a, b) => {
+        const m = sortOrder === 'asc' ? 1 : -1;
+        if (sortField === 'created_at') return (new Date(a.created_at) - new Date(b.created_at)) * m;
+        if (sortField === 'total_amount') return (Number(a.total_amount) - Number(b.total_amount)) * m;
+        if (sortField === 'customer_name') {
+          return ((a.customer_name || 'Walk-in').localeCompare(b.customer_name || 'Walk-in')) * m;
+        }
+        return 0;
+      });
   }, [sales, searchQuery, paymentFilter, sortField, sortOrder]);
 
+  const payBadge = (method) => {
+    if (method === 'UPI')  return 'bg-violet-50 text-violet-700 border-violet-200';
+    if (method === 'Card') return 'bg-blue-50 text-blue-700 border-blue-200';
+    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  };
+
+  const SortTh = ({ label, field, right }) => (
+    <th
+      onClick={() => handleSort(field)}
+      className={`py-3.5 px-5 font-semibold text-[11px] uppercase tracking-widest text-slate-400 cursor-pointer select-none hover:text-slate-700 transition-colors whitespace-nowrap ${right ? 'text-right' : ''}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <ArrowUpDown size={10} className={sortField === field ? 'text-blue-500' : 'text-slate-300'} />
+      </span>
+    </th>
+  );
+
   return (
-    <div className="space-y-6 animate-fade-in relative">
-      
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Sales History & Logs</h1>
-        <p className="text-slate-500 mt-1 text-sm font-medium">Verify past transaction history, reprint customer receipts, and analyze payment statistics.</p>
+    <div className="space-y-6 animate-fade-up pb-8">
+
+      {/* ── Page Header ─────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <History size={22} className="text-blue-600" />
+            Sales History
+          </h1>
+          <p className="text-slate-500 mt-0.5 text-sm">All checkout transactions and invoice records.</p>
+        </div>
+        {/* Summary pills */}
+        <div className="flex flex-wrap gap-3 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-full text-slate-700 shadow-sm">
+            <ShoppingBag size={12} className="text-blue-500" />
+            {sales.length} total bills
+          </span>
+          <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-full text-slate-700 shadow-sm">
+            <IndianRupee size={12} className="text-emerald-500" />
+            ₹{totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })} revenue
+          </span>
+        </div>
       </div>
 
-      {/* Filter panel */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl border border-slate-100 shadow-sm justify-between items-center">
-        
-        {/* Search */}
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+      {/* ── Filters ─────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row gap-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by customer name, phone or Invoice ID..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search by customer, phone or Invoice ID..."
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
         </div>
-
-        {/* Payment filter */}
-        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Payment:</span>
-          <select
-            value={paymentFilter}
-            onChange={(e) => setPaymentFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer"
-          >
-            <option value="All">All Methods</option>
-            <option value="Cash">Cash</option>
-            <option value="UPI">UPI</option>
-            <option value="Card">Card</option>
-          </select>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Payment:</span>
+          <div className="relative">
+            <select
+              value={paymentFilter}
+              onChange={e => setPaymentFilter(e.target.value)}
+              className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+            >
+              <option value="All">All Methods</option>
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Card">Card</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-3 text-slate-400 pointer-events-none" />
+          </div>
         </div>
       </div>
 
-      {/* Transactions list table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      {/* ── Table ───────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-400 text-[10px] font-bold uppercase tracking-wider cursor-pointer">
-                <th className="py-4 px-6" onClick={() => handleSort('created_at')}>
-                  <div className="flex items-center gap-1">
-                    Date & Time <ArrowUpDown size={11} />
-                  </div>
-                </th>
-                <th className="py-4 px-6">Invoice ID</th>
-                <th className="py-4 px-6" onClick={() => handleSort('customer_name')}>
-                  <div className="flex items-center gap-1">
-                    Customer Details <ArrowUpDown size={11} />
-                  </div>
-                </th>
-                <th className="py-4 px-6">Payment Mode</th>
-                <th className="py-4 px-6 text-right">Tax & Saved</th>
-                <th className="py-4 px-6 text-right" onClick={() => handleSort('total_amount')}>
-                  <div className="flex items-center justify-end gap-1">
-                    Grand Total <ArrowUpDown size={11} />
-                  </div>
-                </th>
-                <th className="py-4 px-6 text-right">Actions</th>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <SortTh label="Date & Time"    field="created_at"    />
+                <th className="py-3.5 px-5 font-semibold text-[11px] uppercase tracking-widest text-slate-400 whitespace-nowrap">Invoice ID</th>
+                <SortTh label="Customer"       field="customer_name" />
+                <th className="py-3.5 px-5 font-semibold text-[11px] uppercase tracking-widest text-slate-400 whitespace-nowrap">Payment</th>
+                <th className="py-3.5 px-5 font-semibold text-[11px] uppercase tracking-widest text-slate-400 text-right whitespace-nowrap">Tax / Discount</th>
+                <SortTh label="Grand Total"    field="total_amount"  right />
+                <th className="py-3.5 px-5 font-semibold text-[11px] uppercase tracking-widest text-slate-400 text-right whitespace-nowrap">Invoice</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50 text-xs font-semibold text-slate-600">
+            <tbody>
               {filteredSales.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-16 text-center text-slate-400 font-semibold">
-                    No transactions found in system logs.
+                  <td colSpan="7" className="py-20 text-center text-slate-400 text-sm font-medium">
+                    No transactions found.
                   </td>
                 </tr>
               ) : (
-                filteredSales.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-slate-50/40 transition-colors group">
-                    <td className="py-4 px-6 font-medium text-slate-500">
-                      {new Date(sale.created_at).toLocaleDateString()} {new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                filteredSales.map(sale => (
+                  <tr key={sale.id} className="border-b border-slate-100 hover:bg-slate-50/70 transition-colors group">
+                    <td className="py-4 px-5 text-sm text-slate-500 font-medium whitespace-nowrap">
+                      {new Date(sale.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      <span className="block text-xs text-slate-400">
+                        {new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </td>
-                    <td className="py-4 px-6 font-mono text-slate-400 text-[11px]">
+                    <td className="py-4 px-5 font-mono text-xs text-slate-400 whitespace-nowrap">
                       AMM-{sale.id.slice(0, 8).toUpperCase()}
                     </td>
-                    <td className="py-4 px-6">
-                      <div className="text-slate-800 font-bold">{sale.customer_name || 'Walk-in Customer'}</div>
+                    <td className="py-4 px-5">
+                      <div className="font-semibold text-sm text-slate-800">{sale.customer_name || 'Walk-in Customer'}</div>
                       {sale.customer_phone && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">{sale.customer_phone}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{sale.customer_phone}</div>
                       )}
                     </td>
-                    <td className="py-4 px-6">
-                      <span className={`text-[9px] px-2.5 py-1 rounded-lg font-bold border uppercase tracking-wider ${
-                        sale.payment_method === 'UPI' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                        sale.payment_method === 'Card' ? 'bg-blue-50 border-blue-100 text-blue-600' : 
-                        'bg-emerald-50 border-emerald-100 text-emerald-600'
-                      }`}>
+                    <td className="py-4 px-5">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${payBadge(sale.payment_method)}`}>
+                        <CreditCard size={10} />
                         {sale.payment_method}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-right space-y-0.5">
-                      <div className="text-slate-400 text-[10px]">Tax: ₹{Number(sale.tax_amount || 0).toFixed(2)}</div>
+                    <td className="py-4 px-5 text-right">
+                      <div className="text-xs text-slate-400">GST: ₹{Number(sale.tax_amount || 0).toFixed(2)}</div>
                       {Number(sale.discount_amount) > 0 && (
-                        <div className="text-amber-600 text-[9px] font-bold">Saved: ₹{Number(sale.discount_amount).toFixed(2)}</div>
+                        <div className="text-xs font-semibold text-amber-600 mt-0.5">
+                          Saved: ₹{Number(sale.discount_amount).toFixed(2)}
+                        </div>
                       )}
                     </td>
-                    <td className="py-4 px-6 text-right font-extrabold text-slate-900 text-sm">
-                      ₹{Number(sale.total_amount).toFixed(2)}
+                    <td className="py-4 px-5 text-right">
+                      <span className="font-bold text-base text-slate-900">
+                        ₹{Number(sale.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
                     </td>
-                    <td className="py-4 px-6 text-right">
+                    <td className="py-4 px-5 text-right">
                       <button
                         onClick={() => handleViewReceipt(sale)}
-                        className="p-1.5 bg-white border border-slate-100 hover:border-slate-200 text-slate-500 hover:text-blue-600 rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 hover:border-blue-300 rounded-lg text-xs font-semibold transition-all cursor-pointer"
                       >
-                        <Eye size={13} />
-                        <span>View Invoice</span>
+                        <Eye size={12} />
+                        View
                       </button>
                     </td>
                   </tr>
@@ -242,118 +231,165 @@ export default function SalesHistory({ sales = [], isUsingMock }) {
             </tbody>
           </table>
         </div>
+
+        {filteredSales.length > 0 && (
+          <div className="border-t border-slate-100 px-5 py-3 flex items-center justify-between text-xs text-slate-400 font-medium bg-slate-50/50">
+            <span>{filteredSales.length} record{filteredSales.length !== 1 ? 's' : ''}</span>
+            <span>
+              Total: <span className="font-bold text-slate-700">
+                ₹{filteredSales.reduce((s, x) => s + Number(x.total_amount), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* View Bill Invoice popup Modal */}
+      {/* ── Invoice Modal ────────────────────────────────── */}
       {showInvoice && selectedSale && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden animate-fade-in flex flex-col">
-            
-            {/* Modal Header Actions */}
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-700">
-                Tax Invoice Receipt
-              </span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowInvoice(false)}>
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
+
+          {/* Modal Card */}
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[420px] flex flex-col overflow-hidden animate-scale-in"
+            style={{ maxHeight: 'calc(100vh - 48px)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* ── Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-white shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Eye size={14} className="text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-sm">Tax Invoice</p>
+                  <p className="text-[10px] text-slate-400 font-medium">AMM-{selectedSale.id.slice(0,8).toUpperCase()}</p>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handlePrint}
-                  className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                  title="Print Invoice"
+                  onClick={() => window.print()}
+                  title="Print Receipt"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                 >
-                  <Printer size={16} />
+                  <Printer size={13} />
+                  Print
                 </button>
                 <button
                   onClick={() => setShowInvoice(false)}
-                  className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                 >
                   <X size={16} />
                 </button>
               </div>
             </div>
 
-            {/* Receipt Area for Thermal Printer rendering */}
-            <div className="p-6 overflow-y-auto max-h-[70vh]">
+            {/* ── Receipt Content (scrollable) */}
+            <div className="flex-1 overflow-y-auto p-5">
               {loadingItems ? (
-                <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400 font-bold text-xs">
-                  <Loader2 className="animate-spin text-blue-500" size={24} />
-                  <span>Loading sale items...</span>
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+                  <Loader2 className="animate-spin text-blue-500" size={26} />
+                  <p className="text-sm font-medium">Loading items...</p>
                 </div>
               ) : (
-                <div id="receipt-print-area" className="font-mono text-[11px] text-slate-800 leading-relaxed max-w-[280px] mx-auto bg-slate-50/40 p-4 border border-dashed border-slate-200 rounded-lg">
-                  <div className="text-center space-y-1 mb-4">
-                    <h2 className="font-black text-sm uppercase tracking-wider text-slate-900">AMIT MEGA MART</h2>
-                    <p className="text-[9px] text-slate-500">Retail & POS Billing counter</p>
-                    <p className="text-[9px] text-slate-400">Sector-15, Noida, UP (Pin: 201301)</p>
-                    <p className="text-[9px] text-slate-400">Ph: +91 98765 43210</p>
+                <div id="receipt-print-area" className="font-mono text-[11px] leading-relaxed text-slate-800 max-w-[300px] mx-auto">
+                  {/* Store Header */}
+                  <div className="text-center mb-5 space-y-0.5">
+                    <h2 className="font-black text-base uppercase tracking-widest text-slate-900">AMIT MEGA MART</h2>
+                    <p className="text-[9px] text-slate-500">Retail & POS Billing Counter</p>
+                    <p className="text-[9px] text-slate-400">Sector-15, Noida, UP — 201301</p>
+                    <p className="text-[9px] text-slate-400">Ph: +91 98765 43210 | GSTIN: 09ABCDE1234F1Z5</p>
+                    <div className="border-t border-dashed border-slate-200 my-2" />
                   </div>
 
-                  <div className="border-t border-b border-dashed border-slate-200 py-2.5 my-3.5 space-y-1 text-slate-500">
-                    <p><span className="font-bold text-slate-700">Invoice ID:</span> AMM-{selectedSale.id.slice(0, 8).toUpperCase()}</p>
-                    <p><span className="font-bold text-slate-700">Date:</span> {new Date(selectedSale.created_at).toLocaleDateString()} {new Date(selectedSale.created_at).toLocaleTimeString()}</p>
-                    <p><span className="font-bold text-slate-700">Cashier:</span> Terminal A (Digital)</p>
-                    <p><span className="font-bold text-slate-700">Customer:</span> {selectedSale.customer_name || 'Walk-in Customer'}</p>
+                  {/* Invoice Meta */}
+                  <div className="space-y-1 mb-4 text-slate-600">
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-700">Invoice:</span>
+                      <span>AMM-{selectedSale.id.slice(0,8).toUpperCase()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-700">Date:</span>
+                      <span>{new Date(selectedSale.created_at).toLocaleDateString('en-IN')} {new Date(selectedSale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-700">Cashier:</span>
+                      <span>Terminal A</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-slate-700">Customer:</span>
+                      <span>{selectedSale.customer_name || 'Walk-in Customer'}</span>
+                    </div>
                     {selectedSale.customer_phone && (
-                      <p><span className="font-bold text-slate-700">Phone:</span> {selectedSale.customer_phone}</p>
+                      <div className="flex justify-between">
+                        <span className="font-bold text-slate-700">Phone:</span>
+                        <span>{selectedSale.customer_phone}</span>
+                      </div>
                     )}
                   </div>
 
-                  {/* Items list */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between font-extrabold text-slate-900 border-b border-slate-100 pb-1">
-                      <span>ITEM (QTY x RATE)</span>
-                      <span>AMOUNT</span>
+                  {/* Items */}
+                  <div className="border-t border-dashed border-slate-200 pt-3 mb-3">
+                    <div className="flex justify-between font-black text-slate-900 mb-2 text-[10px] uppercase tracking-wider">
+                      <span>Item</span>
+                      <span>Amount</span>
                     </div>
                     {saleItems.length === 0 ? (
-                      <div className="text-slate-400 text-center py-2 text-[10px]">No item details logged for this sale.</div>
+                      <p className="text-center text-slate-400 py-2 text-[10px]">No item details available.</p>
                     ) : (
                       saleItems.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-start gap-1">
-                          <div className="truncate max-w-[180px]">
-                            <p className="font-bold text-slate-800 truncate">{item.name}</p>
-                            <p className="text-[9px] text-slate-400 font-medium">{item.quantity} x ₹{item.price.toFixed(2)}</p>
+                        <div key={idx} className="flex justify-between items-start gap-2 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-800 leading-tight">{item.name}</p>
+                            <p className="text-[9px] text-slate-400">{item.quantity} × ₹{item.price.toFixed(2)}</p>
                           </div>
-                          <span className="font-bold">₹{(item.price * item.quantity).toFixed(2)}</span>
+                          <span className="font-bold text-slate-900 shrink-0">₹{(item.price * item.quantity).toFixed(2)}</span>
                         </div>
                       ))
                     )}
                   </div>
 
-                  {/* Calculations breakdown summary */}
-                  <div className="border-t border-dashed border-slate-200 mt-4 pt-3.5 space-y-1 text-right text-slate-600">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>₹{(Number(selectedSale.total_amount) + Number(selectedSale.discount_amount || 0) - Number(selectedSale.tax_amount || 0)).toFixed(2)}</span>
+                  {/* Totals */}
+                  <div className="border-t border-dashed border-slate-200 pt-3 space-y-1.5">
+                    <div className="flex justify-between text-slate-500">
+                      <span>Subtotal</span>
+                      <span>₹{(Number(selectedSale.total_amount) + Number(selectedSale.discount_amount||0) - Number(selectedSale.tax_amount||0)).toFixed(2)}</span>
                     </div>
                     {Number(selectedSale.discount_amount) > 0 && (
-                      <div className="flex justify-between text-amber-600 font-bold">
-                        <span>Discount Saved:</span>
-                        <span>-₹{Number(selectedSale.discount_amount).toFixed(2)}</span>
+                      <div className="flex justify-between font-semibold text-amber-600">
+                        <span>Discount</span>
+                        <span>−₹{Number(selectedSale.discount_amount).toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <span>Tax (5% GST):</span>
-                      <span>₹{Number(selectedSale.tax_amount || 0).toFixed(2)}</span>
+                    <div className="flex justify-between text-slate-500">
+                      <span>GST (5%)</span>
+                      <span>₹{Number(selectedSale.tax_amount||0).toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-slate-900 font-black text-sm pt-1.5 border-t border-slate-100 mt-1">
-                      <span>Grand Total:</span>
+                    <div className="flex justify-between font-black text-slate-900 text-sm pt-2 border-t border-slate-200">
+                      <span>GRAND TOTAL</span>
                       <span>₹{Number(selectedSale.total_amount).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 pt-1">
+                      <span>Payment</span>
+                      <span className="font-bold">{selectedSale.payment_method}</span>
                     </div>
                   </div>
 
-                  <div className="border-t border-dashed border-slate-200 mt-5 pt-4 text-center space-y-2 text-slate-400 text-[9px] font-bold">
-                    <p>Paid via: {selectedSale.payment_method.toUpperCase()}</p>
-                    <p className="uppercase tracking-wider text-slate-500">*** Tax Invoice copy ***</p>
-                    <p>Powered by Amit Mega Mart</p>
+                  {/* Footer */}
+                  <div className="border-t border-dashed border-slate-200 mt-4 pt-3 text-center space-y-1">
+                    <p className="font-bold text-slate-500 uppercase tracking-widest text-[9px]">★ Thank You For Shopping ★</p>
+                    <p className="text-slate-400 text-[9px]">Visit us again soon! • amit-megamart.vercel.app</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Close Button */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+            {/* ── Modal Footer */}
+            <div className="shrink-0 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
               <button
                 onClick={() => setShowInvoice(false)}
-                className="w-full py-2 bg-slate-950 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer"
               >
                 Close Receipt
               </button>
@@ -361,7 +397,6 @@ export default function SalesHistory({ sales = [], isUsingMock }) {
           </div>
         </div>
       )}
-      
     </div>
   );
 }

@@ -174,7 +174,7 @@ export default function POS({ products = [], onCheckout }) {
         {/* Search header */}
         <div className="p-4 border-b border-slate-50 bg-slate-50/20 space-y-3">
           <div className="relative">
-            <Search className="absolute left-3 top-3.5 h-4.5 w-4.5 text-slate-400" />
+            <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
@@ -469,107 +469,103 @@ export default function POS({ products = [], onCheckout }) {
         </div>
       </div>
 
-      {/* Tax Invoice Receipt Popup Modal */}
+      {/* ── Tax Invoice Receipt Modal ─────────────────── */}
       {showReceipt && completedSale && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden animate-fade-in flex flex-col">
-            
-            {/* Modal Header Actions */}
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <CheckCircle size={15} className="text-emerald-500" /> Bill Generated
-              </span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowReceipt(false)}>
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
+
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[420px] flex flex-col overflow-hidden animate-scale-in"
+            style={{ maxHeight: 'calc(100vh - 48px)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-white shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <CheckCircle size={14} className="text-emerald-500" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-sm">Bill Generated</p>
+                  <p className="text-[10px] text-slate-400">AMM-{completedSale.id?.slice(0,8).toUpperCase() || 'NEW'}</p>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrint}
-                  className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                  title="Print Invoice"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                 >
-                  <Printer size={16} />
+                  <Printer size={13} /> Print
                 </button>
                 <button
                   onClick={() => setShowReceipt(false)}
-                  className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                 >
                   <X size={16} />
                 </button>
               </div>
             </div>
 
-            {/* Receipt Area for Thermal Printer rendering */}
-            <div className="p-6 overflow-y-auto max-h-[70vh]">
-              <div id="receipt-print-area" className="font-mono text-[11px] text-slate-800 leading-relaxed max-w-[280px] mx-auto bg-slate-50/40 p-4 border border-dashed border-slate-200 rounded-lg">
-                <div className="text-center space-y-1 mb-4">
-                  <h2 className="font-black text-sm uppercase tracking-wider text-slate-900">AMIT MEGA MART</h2>
-                  <p className="text-[9px] text-slate-500">Retail & POS Billing counter</p>
-                  <p className="text-[9px] text-slate-400">Sector-15, Noida, UP (Pin: 201301)</p>
-                  <p className="text-[9px] text-slate-400">Ph: +91 98765 43210</p>
+            {/* Scrollable Receipt */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <div id="receipt-print-area" className="font-mono text-[11px] leading-relaxed text-slate-800 max-w-[300px] mx-auto">
+                <div className="text-center mb-5 space-y-0.5">
+                  <h2 className="font-black text-base uppercase tracking-widest text-slate-900">AMIT MEGA MART</h2>
+                  <p className="text-[9px] text-slate-500">Retail & POS Billing Counter</p>
+                  <p className="text-[9px] text-slate-400">Sector-15, Noida, UP — 201301</p>
+                  <p className="text-[9px] text-slate-400">Ph: +91 98765 43210 | GSTIN: 09ABCDE1234F1Z5</p>
+                  <div className="border-t border-dashed border-slate-200 my-2" />
                 </div>
 
-                <div className="border-t border-b border-dashed border-slate-200 py-2.5 my-3.5 space-y-1 text-slate-500">
-                  <p><span className="font-bold text-slate-700">Invoice ID:</span> AMM-{completedSale.id ? completedSale.id.slice(0, 8).toUpperCase() : 'N/A'}</p>
-                  <p><span className="font-bold text-slate-700">Date:</span> {new Date(completedSale.created_at).toLocaleDateString()} {new Date(completedSale.created_at).toLocaleTimeString()}</p>
-                  <p><span className="font-bold text-slate-700">Cashier:</span> Terminal A (Digital)</p>
-                  <p><span className="font-bold text-slate-700">Customer:</span> {completedSale.customerName}</p>
-                  {completedSale.customerPhone && (
-                    <p><span className="font-bold text-slate-700">Phone:</span> {completedSale.customerPhone}</p>
-                  )}
+                <div className="space-y-1 mb-4 text-slate-600">
+                  <div className="flex justify-between"><span className="font-bold text-slate-700">Invoice:</span><span>AMM-{completedSale.id?.slice(0,8).toUpperCase() || 'N/A'}</span></div>
+                  <div className="flex justify-between"><span className="font-bold text-slate-700">Date:</span><span>{new Date(completedSale.created_at).toLocaleDateString('en-IN')} {new Date(completedSale.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div>
+                  <div className="flex justify-between"><span className="font-bold text-slate-700">Cashier:</span><span>Terminal A</span></div>
+                  <div className="flex justify-between"><span className="font-bold text-slate-700">Customer:</span><span>{completedSale.customerName}</span></div>
+                  {completedSale.customerPhone && <div className="flex justify-between"><span className="font-bold text-slate-700">Phone:</span><span>{completedSale.customerPhone}</span></div>}
                 </div>
 
-                {/* Items list */}
-                <div className="space-y-2">
-                  <div className="flex justify-between font-extrabold text-slate-900 border-b border-slate-100 pb-1">
-                    <span>ITEM (QTY x RATE)</span>
-                    <span>AMOUNT</span>
+                <div className="border-t border-dashed border-slate-200 pt-3 mb-3">
+                  <div className="flex justify-between font-black text-slate-900 mb-2 text-[10px] uppercase tracking-wider">
+                    <span>Item</span><span>Amount</span>
                   </div>
                   {completedSale.cart.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-start gap-1">
-                      <div className="truncate max-w-[180px]">
-                        <p className="font-bold text-slate-800 truncate">{item.name}</p>
-                        <p className="text-[9px] text-slate-400 font-medium">{item.quantity} x ₹{item.price.toFixed(2)}</p>
+                    <div key={idx} className="flex justify-between items-start gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-800 leading-tight">{item.name}</p>
+                        <p className="text-[9px] text-slate-400">{item.quantity} × ₹{item.price.toFixed(2)}</p>
                       </div>
-                      <span className="font-bold">₹{(item.price * item.quantity).toFixed(2)}</span>
+                      <span className="font-bold text-slate-900 shrink-0">₹{(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
 
-                {/* Breakdown Summary */}
-                <div className="border-t border-dashed border-slate-200 mt-4 pt-3.5 space-y-1 text-right text-slate-600">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>₹{completedSale.subtotal.toFixed(2)}</span>
-                  </div>
+                <div className="border-t border-dashed border-slate-200 pt-3 space-y-1.5">
+                  <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>₹{completedSale.subtotal.toFixed(2)}</span></div>
                   {completedSale.discountAmount > 0 && (
-                    <div className="flex justify-between text-amber-600 font-bold">
-                      <span>Discount Saved:</span>
-                      <span>-₹{completedSale.discountAmount.toFixed(2)}</span>
-                    </div>
+                    <div className="flex justify-between font-semibold text-amber-600"><span>Discount</span><span>−₹{completedSale.discountAmount.toFixed(2)}</span></div>
                   )}
-                  <div className="flex justify-between">
-                    <span>Tax (5% GST):</span>
-                    <span>₹{completedSale.taxAmount.toFixed(2)}</span>
+                  <div className="flex justify-between text-slate-500"><span>GST (5%)</span><span>₹{completedSale.taxAmount.toFixed(2)}</span></div>
+                  <div className="flex justify-between font-black text-slate-900 text-sm pt-2 border-t border-slate-200">
+                    <span>GRAND TOTAL</span><span>₹{completedSale.total.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-slate-900 font-black text-sm pt-1.5 border-t border-slate-100 mt-1">
-                    <span>Grand Total:</span>
-                    <span>₹{completedSale.total.toFixed(2)}</span>
-                  </div>
+                  <div className="flex justify-between text-slate-500 pt-1"><span>Payment</span><span className="font-bold">{completedSale.paymentMethod}</span></div>
                 </div>
 
-                <div className="border-t border-dashed border-slate-200 mt-5 pt-4 text-center space-y-2 text-slate-400 text-[9px] font-bold">
-                  <p>Paid via: {completedSale.paymentMethod.toUpperCase()}</p>
-                  <p className="uppercase tracking-wider text-slate-500">*** Thank You For Shopping ***</p>
-                  <p>Visit again soon!</p>
+                <div className="border-t border-dashed border-slate-200 mt-4 pt-3 text-center space-y-1">
+                  <p className="font-bold text-slate-500 uppercase tracking-widest text-[9px]">★ Thank You For Shopping ★</p>
+                  <p className="text-slate-400 text-[9px]">Visit us again soon!</p>
                 </div>
               </div>
             </div>
 
-            {/* Close Button */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+            {/* Footer */}
+            <div className="shrink-0 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
               <button
                 onClick={() => setShowReceipt(false)}
-                className="w-full py-2 bg-slate-950 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer"
               >
-                Close and Return to Scanning
+                Close & Return to Scanning
               </button>
             </div>
           </div>
