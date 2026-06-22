@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { supabase } from './supabaseClient';
 import toast from 'react-hot-toast';
+import { supabase, isSupabaseReady } from './supabaseClient';
 
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -102,13 +102,8 @@ function App() {
   const [sales, setSales] = useState([]);
   const [isUsingMock, setIsUsingMock] = useState(false);
 
-  const isSupabaseConfigured = useCallback(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    return url && !url.includes('your-project-id') && url.startsWith('https://');
-  }, []);
-
   const fetchProducts = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseReady) {
       const stored = localStorage.getItem('amm_products');
       if (stored) {
         setProducts(JSON.parse(stored));
@@ -141,10 +136,10 @@ function App() {
       setIsUsingMock(true);
       toast.error('Failed to load products from database. Operating in offline fallback mode.');
     }
-  }, [isSupabaseConfigured]);
+  }, []);
 
   const fetchSales = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseReady) {
       const stored = localStorage.getItem('amm_sales');
       if (stored) {
         setSales(JSON.parse(stored));
@@ -175,7 +170,7 @@ function App() {
         localStorage.setItem('amm_sales', JSON.stringify(seedSales));
       }
     }
-  }, [isSupabaseConfigured]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -193,7 +188,7 @@ function App() {
   }, [fetchProducts, fetchSales]);
 
   const handleAddProduct = async (newProduct) => {
-    if (isUsingMock) {
+    if (!isSupabaseReady || isUsingMock) {
       const updated = [...products, { ...newProduct, id: Date.now().toString(), created_at: new Date().toISOString() }];
       setProducts(updated);
       localStorage.setItem('amm_products', JSON.stringify(updated));
@@ -222,7 +217,7 @@ function App() {
   };
 
   const handleUpdateProduct = async (id, updatedFields) => {
-    if (isUsingMock) {
+    if (!isSupabaseReady || isUsingMock) {
       const updated = products.map(p => p.id === id ? { ...p, ...updatedFields } : p);
       setProducts(updated);
       localStorage.setItem('amm_products', JSON.stringify(updated));
@@ -252,7 +247,7 @@ function App() {
   };
 
   const handleDeleteProduct = async (id) => {
-    if (isUsingMock) {
+    if (!isSupabaseReady || isUsingMock) {
       const updated = products.filter(p => p.id !== id);
       setProducts(updated);
       localStorage.setItem('amm_products', JSON.stringify(updated));
@@ -276,7 +271,7 @@ function App() {
   };
 
   const handleCheckout = async (saleDetails) => {
-    if (isUsingMock) {
+    if (!isSupabaseReady || isUsingMock) {
       // 1. Update local stock levels
       const updatedProducts = products.map(p => {
         const cartItem = saleDetails.cart.find(c => c.id === p.id);
@@ -370,7 +365,7 @@ function App() {
   };
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster position="top-right" />
       <Routes>
         <Route path="/" element={<Layout isUsingMock={isUsingMock} />}>

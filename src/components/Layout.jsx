@@ -5,7 +5,6 @@ import { LayoutDashboard, ShoppingCart, Package, History, Store, Globe, WifiOff,
 export default function Layout({ isUsingMock }) {
   const location = useLocation();
 
-  // Load initial collapsible sidebar preference from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('amm_sidebar_collapsed') === 'true';
   });
@@ -25,77 +24,65 @@ export default function Layout({ isUsingMock }) {
     { name: 'Sales Logs', path: '/sales', icon: History },
   ];
 
+  // POS page needs a rigid height layout (no page scroll); other pages need free scroll
+  const isPOS = location.pathname === '/pos';
+
   return (
     <div className="flex h-screen bg-slate-50/50 text-slate-800 antialiased font-sans overflow-hidden">
-      
-      {/* Sidebar */}
+
+      {/* ── Sidebar ─────────────────────────────────────── */}
       <aside className={`transition-all duration-300 bg-white border-r border-slate-100 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 shrink-0 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-        
+
         {/* Brand Header & Toggle */}
-        <div className={`p-5 flex items-center justify-between border-b border-slate-50 bg-white h-[77px] shrink-0 ${isCollapsed ? 'px-4 justify-center' : 'px-6'}`}>
+        <div className={`flex items-center justify-between border-b border-slate-50 bg-white h-[72px] shrink-0 ${isCollapsed ? 'px-4 justify-center' : 'px-5'}`}>
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2.5 rounded-xl text-white shadow-md shadow-blue-200 shrink-0">
-              <Store size={20} className="animate-pulse" />
+              <Store size={18} />
             </div>
             {!isCollapsed && (
-              <div className="animate-fade-in">
-                <h1 className="font-bold text-slate-900 leading-tight text-[14px] tracking-tight">Amit Mega Mart</h1>
+              <div className="animate-fade-in overflow-hidden">
+                <h1 className="font-bold text-slate-900 leading-tight text-[13px] tracking-tight whitespace-nowrap">Amit Mega Mart</h1>
                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">POS & Management</p>
               </div>
             )}
           </div>
-          
-          {!isCollapsed && (
-            <button 
-              onClick={toggleSidebar} 
-              className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-slate-700 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer"
-              title="Collapse Sidebar"
-            >
-              <ChevronLeft size={14} />
-            </button>
-          )}
+
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-slate-700 rounded-lg border border-slate-100 hover:border-slate-200 transition-colors cursor-pointer shrink-0 ml-2"
+            title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            {isCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+          </button>
         </div>
 
-        {/* Collapsed Expand Trigger (Centered Arrow when collapsed) */}
-        {isCollapsed && (
-          <div className="py-2.5 border-b border-slate-50 flex justify-center bg-slate-50/10">
-            <button 
-              onClick={toggleSidebar} 
-              className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg border border-slate-100/50 hover:border-slate-200 transition-colors cursor-pointer"
-              title="Expand Sidebar"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        )}
-
         {/* Connection Status Badge */}
-        <div className={`py-4 border-b border-slate-50 bg-slate-50/20 shrink-0 ${isCollapsed ? 'px-4 flex justify-center' : 'px-6'}`}>
+        <div className={`py-3 border-b border-slate-50 bg-slate-50/20 shrink-0 ${isCollapsed ? 'px-3 flex justify-center' : 'px-4'}`}>
           {isUsingMock ? (
             isCollapsed ? (
-              <div className="bg-amber-50 p-2.5 rounded-xl text-amber-500 border border-amber-100/40 cursor-help" title="Offline Demo Mode (Using Local Storage)">
-                <WifiOff size={16} />
+              <div className="bg-amber-50 p-2 rounded-xl text-amber-500 border border-amber-100/40 cursor-help" title="Offline Mode — Using Local Storage">
+                <WifiOff size={15} />
               </div>
             ) : (
               <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-100/40 w-full animate-fade-in">
-                <WifiOff size={15} className="shrink-0 text-amber-500" />
-                <div className="text-left">
+                <WifiOff size={14} className="shrink-0 text-amber-500" />
+                <div className="text-left overflow-hidden">
                   <p className="text-[10px] font-bold leading-none">Offline Demo</p>
-                  <p className="text-[8px] text-amber-600 mt-0.5 font-bold">Local storage sync</p>
+                  <p className="text-[8px] text-amber-600 mt-0.5 font-bold truncate">Local storage sync</p>
                 </div>
               </div>
             )
           ) : (
             isCollapsed ? (
-              <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-500 border border-emerald-100/40 cursor-help" title="Database Connected (Supabase Online)">
-                <Globe size={16} />
+              <div className="bg-emerald-50 p-2 rounded-xl text-emerald-500 border border-emerald-100/40 cursor-help" title="Live — Supabase DB Connected">
+                <Globe size={15} />
               </div>
             ) : (
               <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100/40 w-full animate-fade-in">
-                <Globe size={15} className="shrink-0 text-emerald-500" />
-                <div className="text-left">
+                <Globe size={14} className="shrink-0 text-emerald-500" />
+                <div className="text-left overflow-hidden">
                   <p className="text-[10px] font-bold leading-none">Live Connected</p>
-                  <p className="text-[8px] text-emerald-600 mt-0.5 font-bold">Supabase DB active</p>
+                  <p className="text-[8px] text-emerald-600 mt-0.5 font-bold truncate">Supabase DB active</p>
                 </div>
               </div>
             )
@@ -103,7 +90,7 @@ export default function Layout({ isUsingMock }) {
         </div>
 
         {/* Navigation items */}
-        <nav className="flex-1 p-3.5 space-y-1.5 overflow-y-auto">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
@@ -121,39 +108,46 @@ export default function Layout({ isUsingMock }) {
                 }`}
               >
                 {isActive && (
-                  <span className="absolute left-0 w-1.5 h-5 bg-blue-600 rounded-r-full" />
+                  <span className="absolute left-0 w-1 h-5 bg-blue-600 rounded-r-full" />
                 )}
-                <Icon size={18} className={`transition-transform duration-200 group-hover:scale-105 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
-                {!isCollapsed && <span className="text-[13px] animate-fade-in">{item.name}</span>}
+                <Icon
+                  size={17}
+                  className={`transition-transform duration-200 group-hover:scale-105 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`}
+                />
+                {!isCollapsed && <span className="text-[13px] animate-fade-in truncate">{item.name}</span>}
               </Link>
             );
           })}
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-50 bg-slate-50/20 flex flex-col gap-1 items-center justify-center shrink-0">
+        <div className="p-3 border-t border-slate-50 bg-slate-50/20 flex flex-col gap-0.5 items-center justify-center shrink-0">
           {!isCollapsed ? (
             <>
-              <div className="text-[10px] font-bold text-slate-700 animate-fade-in">
-                Amit Mega Mart Retail
-              </div>
-              <div className="text-[8px] text-slate-400 font-bold animate-fade-in">
-                Production System v1.5.0
-              </div>
+              <div className="text-[10px] font-bold text-slate-700 animate-fade-in">Amit Mega Mart Retail</div>
+              <div className="text-[8px] text-slate-400 font-bold animate-fade-in">Production System v1.5.0</div>
             </>
           ) : (
-            <div className="text-[9px] font-black text-slate-400 uppercase tracking-tight">
-              v1.5
-            </div>
+            <div className="text-[9px] font-black text-slate-400 uppercase tracking-tight">v1.5</div>
           )}
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-auto bg-gradient-to-b from-slate-50/60 to-slate-100/40 flex flex-col">
-        <div className="p-6 md:p-8 w-full flex-grow flex flex-col overflow-hidden min-h-0">
-          <Outlet />
-        </div>
+      {/* ── Main Content ────────────────────────────────── */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {isPOS ? (
+          /* POS page: fixed height, no outer scroll — inner panels scroll independently */
+          <div className="flex-1 p-5 md:p-6 overflow-hidden flex flex-col min-h-0">
+            <Outlet />
+          </div>
+        ) : (
+          /* All other pages: allow natural vertical scrolling */
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-6 md:p-8 max-w-full">
+              <Outlet />
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

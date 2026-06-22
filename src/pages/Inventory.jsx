@@ -157,7 +157,7 @@ export default function Inventory({ products = [], onAddProduct, onUpdateProduct
   };
 
   return (
-    <div className="space-y-6 animate-fade-in relative">
+    <div className="space-y-6 animate-fade-in">
       {/* Top dashboard summary header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>

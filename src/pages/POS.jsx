@@ -27,15 +27,7 @@ export default function POS({ products = [], onCheckout }) {
     inputRef.current?.focus();
   }, [showReceipt]);
 
-  // Auto-trigger print when receipt modal opens
-  useEffect(() => {
-    if (showReceipt && completedSale) {
-      const timer = setTimeout(() => {
-        window.print();
-      }, 400); // 400ms delay to let the DOM settle and render
-      return () => clearTimeout(timer);
-    }
-  }, [showReceipt, completedSale]);
+  // NOTE: Auto-print removed — cashier manually clicks Print on the receipt modal.
 
   // Extract unique categories
   const categories = React.useMemo(() => {
@@ -175,10 +167,10 @@ export default function POS({ products = [], onCheckout }) {
   };
 
   return (
-    <div className="h-full flex-grow flex gap-6 relative animate-fade-in min-h-0">
+    <div className="flex-1 flex gap-4 relative animate-fade-in min-h-0 overflow-hidden">
       
       {/* Left Pane - Visual Catalog & Grid */}
-      <div className="flex-[1.2] flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-w-[340px]">
+      <div className="flex-1 flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-w-0">
         {/* Search header */}
         <div className="p-4 border-b border-slate-50 bg-slate-50/20 space-y-3">
           <div className="relative">
@@ -256,7 +248,7 @@ export default function POS({ products = [], onCheckout }) {
       </div>
 
       {/* Center Pane - Barcode Scan & Cart */}
-      <div className="flex-[1.4] flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-w-[360px]">
+      <div className="flex-[1.3] flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-w-0">
         {/* Scanner Barcode Input */}
         <div className="p-4 border-b border-slate-50 bg-slate-50/20">
           <form onSubmit={handleScan} className="relative">
@@ -336,7 +328,7 @@ export default function POS({ products = [], onCheckout }) {
       </div>
 
       {/* Right Pane - Checkout Summary Sheet */}
-      <div className="w-80 shrink-0 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
+      <div className="w-72 shrink-0 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
         <div className="p-4 border-b border-slate-50">
           <h3 className="font-bold text-slate-900 text-sm">Customer & Summary</h3>
         </div>
